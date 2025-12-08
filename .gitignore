@@ -26,6 +26,3 @@ _deps/
 # python
 *.egg-info/
 __pycache__/
-
-# rust builds
-target/
