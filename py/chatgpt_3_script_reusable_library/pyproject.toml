@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "json-requests"
+version = "0.0.1"
+description = "Sample JSON fetching utility"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+json-requests = "json_requests.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

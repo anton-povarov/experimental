@@ -1,0 +1,14 @@
+{
+  "python.testing.pytestArgs": ["."],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  "files.associations": {
+    "*.embeddedhtml": "html",
+    "*.ac": "shellscript",
+    "*.json": "jsonc",
+    ".env.development": "properties",
+    "vector": "cpp",
+    "unordered_map": "cpp"
+  },
+  "cmake.sourceDirectory": "/Users/antoxa/_Dev/_Exp/cpp/lc128_longest_consecutive_sequence"
+}

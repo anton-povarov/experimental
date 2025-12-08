@@ -1,0 +1,94 @@
+# --- Base Style ---
+BasedOnStyle: LLVM # Start from LLVM's coding style as the baseline
+Language: Cpp # Apply these rules to C++ source files
+
+# --- Indentation and Tabs ---
+IndentWidth: 4 # Logical indentation level = 4 spaces
+TabWidth: 4 # One tab represents 4 spaces visually
+UseTab: ForIndentation # Use tabs only for leading indentation, not for alignment
+ContinuationIndentWidth: 8 # Wrapped lines get double indentation (for readability)
+IndentCaseLabels: true # Indent 'case' labels one level inside switch
+IndentGotoLabels: false # 'goto' labels stay flush to the left margin
+IndentPPDirectives: None # Preprocessor directives (#if/#define) stay unindented
+AccessModifierOffset: -4 # Access specifiers (public:, private:) align with class, no extra indent
+AlignAfterOpenBracket: Align # Align continued parameters and arguments vertically after '('
+
+# --- Braces and Layout ---
+AllowShortBlocksOnASingleLine: Never # Never collapse braces for blocks to one line
+AllowShortFunctionsOnASingleLine: InlineOnly # Allow short inline functions on one line
+AllowShortIfStatementsOnASingleLine: Never # Never allow single-line ifs
+AllowShortLoopsOnASingleLine: false # Multi-line loops only, for clarity
+# BreakBeforeBraces: Mozilla # complicated, see
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterEnum: false
+  AfterStruct: true
+  AfterClass: true
+  AfterFunction: true
+  SplitEmptyFunction: false
+  AfterNamespace: false
+  BeforeCatch: true
+  BeforeElse: true
+BreakConstructorInitializers: BeforeComma # Put each initializer on its own line if needed
+PackConstructorInitializers: Never
+
+# --- Spaces ---
+SpaceBeforeParens: ControlStatements # Add space before parentheses in 'if', 'for', etc.
+SpaceBeforeSquareBrackets: false # No space before square brackets
+SpaceInEmptyParentheses: false # No space in "()"
+SpacesBeforeTrailingComments: 1 # One space before inline comment starts
+SpacesInParentheses: false # No spaces inside parentheses "(x)"
+SpacesInSquareBrackets: false # No spaces inside "[]"
+SpacesInAngles: false # No spaces inside template brackets "<T>"
+SpaceAfterCStyleCast: false # No space after C-style casts "(int)x"
+SpaceAfterTemplateKeyword: true # Require space after 'template' keyword
+
+# --- Line Breaks and Wrapping ---
+ColumnLimit: 110 # Enforce character max line width
+ReflowComments: false # Rewrap comments to fit within ColumnLimit
+KeepEmptyLinesAtTheStartOfBlocks: true # Do not remove redundant empty lines at block start
+BreakBeforeBinaryOperators: None # Break before binary operators
+BreakBeforeTernaryOperators: true # Break lines before '?' and ':'
+BreakStringLiterals: true # Allow breaking long string literals into multiple lines
+AlwaysBreakTemplateDeclarations: true # template<class T> will be on it's own line
+SeparateDefinitionBlocks: Leave # use empty lines to separate blocks?
+EmptyLineAfterAccessModifier: Leave # leave empty lines after private/public
+
+# --- Includes ---
+IncludeBlocks: Regroup # Group and reorder includes by category
+IncludeCategories: # Define priority of include groups
+  - Regex: '^<.*\.h>' # 1. C headers first (e.g., <stdio.h>)
+    Priority: -10
+  - Regex: "^<.*>" # 2. Other system headers
+    Priority: -5
+  - Regex: '^".*\/.*\.hpp"' # 3. Local/project headers
+    Priority: 1
+SortIncludes: true # Automatically sort includes within groups
+
+# --- Alignments ---
+AlignConsecutiveDeclarations: Consecutive # aligns struct members and function decls
+AlignArrayOfStructures: Right # aligns struct initializers
+AlignConsecutiveAssignments:
+  Enabled: false
+  AcrossEmptyLines: false
+  AcrossComments: false
+  AlignCompound: true
+AlignOperands: AlignAfterOperator
+
+# --- Pointers and References ---
+PointerAlignment: Right # Place '*' next to variable name (e.g., int* ptr)
+ReferenceAlignment: Right # Same for references (e.g., int& ref)
+DerivePointerAlignment: false # Don’t guess pointer style from existing code
+
+# --- Namespaces ---
+NamespaceIndentation: None # Don’t indent contents of namespaces
+FixNamespaceComments: true # Add trailing comment for closing namespace (e.g., // namespace foo)
+CompactNamespaces: false # Don’t collapse nested namespaces into one line
+
+# --- Comments ---
+CommentPragmas: "^ IWYU pragma:" # Special pragma regex for include management
+AlignTrailingComments: true # Vertically align trailing comments where practical
+
+# --- Misc ---
+Cpp11BracedListStyle: true # Enforce consistent brace style for initializer lists
+UseCRLF: false # Use LF (Unix) line endings instead of CRLF (Windows)

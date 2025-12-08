@@ -1,0 +1,524 @@
+package main
+
+import (
+	"fmt"
+	"iter"
+	"math"
+	"slices"
+	"strings"
+)
+
+// ------------------------------------------------------------------------------------------------
+
+func map_slice[Slice ~[]E, E any, R any](s Slice, apply func(E) R) (result []R) {
+	result = make([]R, len(s))
+	for i, elt := range s {
+		result[i] = apply(elt)
+	}
+	return
+}
+
+func map_iter[Seq iter.Seq[E], E any, R any](s Seq, apply func(E) R) iter.Seq[R] {
+	return func(yield func(R) bool) {
+		for elt := range s {
+			if !yield(apply(elt)) {
+				return
+			}
+		}
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+
+const ngram_length = 3
+
+func init() {
+	if 1 > ngram_length || ngram_length > 4 {
+		panic("ngram_length must be in range 2 or 3 or 4")
+	}
+}
+
+// it could be a uint32 tbh
+type ngram [ngram_length]byte
+
+func ngram_less(l, r ngram) int {
+	g_l := (int(l[0]) << 16) | (int(l[1]) << 8) | int(l[2])
+	g_r := (int(r[0]) << 16) | (int(r[1]) << 8) | int(r[2])
+	return g_l - g_r
+}
+
+func ngram_from_str(str string) (g ngram) {
+	copy(g[:], str)
+	return g
+}
+
+func (g *ngram) String() string {
+	return string(g[:])
+}
+
+func split_into_ngrams(str string) []ngram {
+	if len(str) < 3 {
+		return nil
+	}
+
+	res := make([]ngram, 0, len(str)-ngram_length+1)
+	for i := 0; i < len(str)-ngram_length+1; i++ {
+		res = append(res, ngram_from_str(str[i:i+ngram_length]))
+	}
+	return res
+}
+
+// ngram_iterator iterates over all ngrams in a given string
+// useful when you don't want to materialize the array of trigrams, but just to iterate
+func ngram_iterator(str string) iter.Seq2[int, ngram] {
+	return func(yield func(int, ngram) bool) {
+		if len(str) < 3 {
+			return
+		}
+
+		for i := range len(str) - ngram_length + 1 {
+			if !yield(i, ngram_from_str(str[i:i+ngram_length])) {
+				return
+			}
+		}
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+
+type NgramSet map[ngram]int
+
+func ngrams_as_multiset(ngrams []ngram) NgramSet {
+	result := make(NgramSet, len(ngrams))
+	for _, ng := range ngrams {
+		result[ng] = result[ng] + 1
+	}
+	return result
+}
+
+func ngram_multiset_intersect_and_union_size(l, r NgramSet) (int, int) {
+	intersect_total := 0
+	union_total := 0
+	for ngram, cnt := range l {
+		intersect_cnt := min(cnt, r[ngram])
+		intersect_total += intersect_cnt
+		union_total += cnt
+	}
+
+	for _, cnt := range r {
+		union_total += cnt
+	}
+
+	return intersect_total, union_total
+}
+
+// returns
+// /         |A intersect B|
+// result = -----------------
+// /	       |A union B| = |A|+|B|-|A intersect B|
+func ngram_multiset_similarity__jaccard(l, r NgramSet) float64 {
+	intersect_size, union_size := ngram_multiset_intersect_and_union_size(l, r)
+	real_union := union_size - intersect_size
+
+	// both empty (union_size == intersect_size == 0)
+	// both non-empty equal sets (union_size == intersect_size) > 0
+	if real_union == 0 {
+		return 1.0
+	}
+	return float64(intersect_size) / float64(real_union)
+}
+
+// returns
+// /         2 * |A intersect B|
+// result = ---------------------
+// /	          |A| + |B|
+func ngram_multiset_similarity__dguy(l, r NgramSet) float64 {
+	intersect_size, union_size := ngram_multiset_intersect_and_union_size(l, r)
+
+	// both empty sets (intersect_size == union_size == 0)
+	// both non-empty equal sets (union_size == intersect_size) > 0
+	if union_size == 0 {
+		return 1.0
+	}
+	return 2.0 * float64(intersect_size) / float64(union_size)
+}
+
+// ------------------------------------------------------------------------------------------------
+
+type NgramSlice []ngram
+
+func ngrams_as_slice(ngrams []ngram) []ngram {
+	out := make([]ngram, len(ngrams))
+	copy(out, ngrams)
+	slices.SortFunc(out, func(l, r ngram) int { return ngram_less(l, r) })
+	return out
+}
+
+func ngram_slice_intersect_and_union_size(l, r NgramSlice) (int, int) {
+	l_len := len(l)
+	r_len := len(r)
+	i := 0
+	j := 0
+
+	n_intersect := 0
+
+	for (i < l_len) && (j < r_len) {
+		cmp := ngram_less(l[i], r[j])
+
+		switch {
+		case cmp < 0:
+			i++
+		case cmp > 0:
+			j++
+		default: // equal
+			val := l[i]
+
+			// count equal elts for l
+			end_i := i + 1
+			for (end_i < l_len) && ngram_less(l[end_i], val) == 0 {
+				end_i++
+			}
+
+			// count equal elts for r
+			end_j := j + 1
+			for (end_j < r_len) && ngram_less(val, r[end_j]) == 0 {
+				end_j++
+			}
+
+			n_intersect += min(end_i-i, end_j-j)
+			i = end_i
+			j = end_j
+		}
+	}
+
+	return n_intersect, len(l) + len(r)
+}
+
+// computes Jarrard similarity
+// returns
+// /         |A intersect B|
+// result = -----------------
+// /	       |A union B| = |A|+|B|-|A intersect B|
+func ngram_slice_similarity__jaccard(l, r NgramSlice) float64 {
+	intersect_size, union_size := ngram_slice_intersect_and_union_size(l, r)
+	real_union := union_size - intersect_size
+
+	// both empty (union_size == intersect_size == 0)
+	// both non-empty equal sets (union_size == intersect_size) > 0
+	if real_union == 0 {
+		return 1.0
+	}
+	return float64(intersect_size) / float64(real_union)
+}
+
+// computes Dice similarity (also known as the Sørensen-Dice Index)
+// returns
+// /         2 * |A intersect B|
+// result = ---------------------
+// /	          |A| + |B|
+func ngram_slice_similarity__dguy(l, r NgramSlice) float64 {
+	intersect_size, union_size := ngram_slice_intersect_and_union_size(l, r)
+
+	// both empty sets (intersect_size == union_size == 0)
+	// both non-empty equal sets (union_size == intersect_size) > 0
+	if union_size == 0 {
+		return 1.0
+	}
+	return 2.0 * float64(intersect_size) / float64(union_size)
+}
+
+// ------------------------------------------------------------------------------------------------
+
+type IndexLine struct {
+	lineNumber int
+	rawString  string // need to compare actual strings
+	// ngrams     NgramSet // used by similarity search only, looses repeated ones
+	ngrams NgramSlice // used by similarity search only
+}
+
+type InvertedLine struct {
+	ngram   ngram
+	line    *IndexLine // the line we're talking about
+	offsets []int      // ngram offsets for a certain ngram
+}
+
+type Index struct {
+	lines    []*IndexLine
+	inverted map[ngram][]InvertedLine
+}
+
+func (il *InvertedLine) String() string {
+	return fmt.Sprintf("{ l: %d, off: %v }", il.line.lineNumber, il.offsets)
+}
+
+func NewIndex() *Index {
+	return &Index{lines: nil, inverted: make(map[ngram][]InvertedLine)}
+}
+
+func (index *Index) setFromLines(lines []string) {
+	for i, line := range lines {
+		ngrams := split_into_ngrams(line)
+		indexLine := &IndexLine{lineNumber: i, rawString: line, ngrams: ngrams_as_slice(ngrams)}
+		// indexLine := &IndexLine{lineNumber: i, rawString: line, ngrams: ngrams_as_multiset(ngrams)}
+		index.lines = append(index.lines, indexLine)
+
+		for n, ngram := range ngrams {
+			invLines, ok := index.inverted[ngram]
+			if !ok {
+				invLines = make([]InvertedLine, 0, 1)
+			}
+
+			if len(invLines) == 0 || invLines[len(invLines)-1].line != indexLine {
+				newInvLine := InvertedLine{ngram: ngram, line: indexLine, offsets: nil}
+				invLines = append(invLines, newInvLine)
+			}
+
+			invLine := &invLines[len(invLines)-1]
+			invLine.offsets = append(invLine.offsets, n)
+			index.inverted[ngram] = invLines
+		}
+	}
+}
+
+type SearchResultItem struct {
+	line   *IndexLine
+	offset int
+}
+
+type SearchResult struct {
+	query string
+	items []SearchResultItem
+}
+
+// findLeastCommonNgramOfStr finds the index in [ngrams] of the trigram
+// that occurs least frequently in this index
+// in addition, returns the number of occurrences of this trigram in this index
+func (index *Index) findLeastCommonNgramOfStr(query_str string) (least_common_idx int, line_count int) {
+	least_common_idx = -1
+	line_count = 0
+
+	for i, q_ngram := range ngram_iterator(query_str) {
+		curr_line_count := len(index.inverted[q_ngram])
+		if least_common_idx < 0 || curr_line_count < line_count {
+			least_common_idx = i
+			line_count = curr_line_count
+		}
+		if line_count == 0 {
+			break
+		}
+	}
+	return
+}
+
+func (index *Index) findSubstring(query_str string) (result SearchResult) {
+	result.query = query_str
+	if len(query_str) < 3 {
+		return result
+	}
+
+	// pick the least common trigram
+	// antoxa: this optimization can definitely work, but super data dependent
+	//  so deciding when to use it - is very tricky
+	//  i.e. sometimes touching the hash entries is more expensive than just picking the first trigram
+	//
+	// least_common_idx, least_common_line_cnt := index.findLeastCommonNgramOfStr(query_str)
+	// if least_common_line_cnt == 0 { // no match
+	// 	return result
+	// }
+
+	least_common_idx := 0
+
+	query_ngram := ngram_from_str(query_str[least_common_idx : least_common_idx+ngram_length])
+	invertedNode := index.inverted[query_ngram]
+	if len(invertedNode) == 0 {
+		return result
+	}
+
+	// calculate how many results we're likely to have
+	// this assumes that every possible offset of this trigram will result in a successful match
+	// the assumption is unrealistic tbh, except for super popular searches (like "result" or "err")
+	// but it does trade memory footprint for faster searches (and less GC pressure, due to fewer reallocs)
+	// it is worth it, according to benchmarks (see search_bench_test.go)
+	resultCapacity := 0
+	for _, invLine := range invertedNode {
+		resultCapacity += len(invLine.offsets)
+	}
+	result.items = make([]SearchResultItem, 0, resultCapacity)
+
+	// now scan the inverted index node
+	for _, invLine := range invertedNode {
+		for _, offset := range invLine.offsets {
+			// this is where the actual string starts,
+			// provided that least_common_idx is the index of ngram we're using offsets from
+			start := offset - least_common_idx
+
+			// still need a bounds check however
+			if start+len(query_str) > len(invLine.line.rawString) {
+				continue
+			}
+
+			// simple string comparison should be enough, probably SSE under the hood
+			candidate_str := invLine.line.rawString[start : start+len(query_str)]
+			if candidate_str == query_str {
+				result.items = append(result.items, SearchResultItem{line: invLine.line, offset: start})
+			}
+		}
+	}
+
+	return result
+}
+
+type LineMatches struct {
+	line    *IndexLine
+	offsets []int
+}
+
+func (sr SearchResult) GroupByLine() (result []LineMatches) {
+	matches := make(map[int]*LineMatches)
+	for _, match := range sr.items {
+		lm, ok := matches[match.line.lineNumber]
+		if !ok {
+			lm = &LineMatches{line: match.line, offsets: nil}
+			matches[match.line.lineNumber] = lm
+		}
+		lm.offsets = append(lm.offsets, match.offset)
+	}
+
+	for _, match := range matches {
+		result = append(result, *match)
+	}
+	return result
+}
+
+func (lm LineMatches) PartsIterator(query_str string) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		start := 0
+		for _, offset := range lm.offsets {
+			if !yield(lm.line.rawString[start:offset]) {
+				return
+			}
+
+			start = offset
+			offset += len(query_str)
+			if !yield(lm.line.rawString[start:offset]) {
+				return
+			}
+
+			start = offset
+		}
+
+		if !yield(lm.line.rawString[start:]) {
+			return
+		}
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+
+type SimilarLine struct {
+	line       *IndexLine
+	similarity float64
+}
+
+type SimilarityFunc func(query_set NgramSlice, line_set NgramSlice) float64
+
+// type SimilarityFunc func(query_set NgramSet, line_set NgramSet) float64
+
+func (index *Index) findSimilarLines(query_str string, sim_threshold float64, simfunc SimilarityFunc) (result []SimilarLine) {
+	// query_ngrams := ngrams_as_multiset(split_into_ngrams(query_str))
+	query_ngrams := ngrams_as_slice(split_into_ngrams(query_str))
+
+	result_dedup := make(map[int]struct{})
+
+	for _, q_ngram := range query_ngrams {
+		// for q_ngram := range query_ngrams {
+		invLines := index.inverted[q_ngram]
+		for _, invLine := range invLines {
+			if _, ok := result_dedup[invLine.line.lineNumber]; !ok {
+				similarity := simfunc(query_ngrams, invLine.line.ngrams)
+				if similarity > sim_threshold {
+					result_dedup[invLine.line.lineNumber] = struct{}{}
+					result = append(result, SimilarLine{line: invLine.line, similarity: similarity})
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+// ------------------------------------------------------------------------------------------------
+
+func main() {
+	text := `
+func (index *NGramIndex) appendLine(line string) {
+	// fmt.Printf("addLine[%d] -> %#v\n", lineNumber, ngrams)
+	trigrams := make_trigrams(line)
+
+	lineNumber := uint(len(index.lines))
+	indexLine := &NGramIndexLine{lineNumber: lineNumber, rawString: line, trigrams: trigrams}
+	index.lines = append(index.lines, indexLine)
+
+	for _, tri := range trigrams {
+		entry, ok := index.tri[tri]
+		if !ok {
+			entry = make([]*NGramIndexLine, 0, 1)
+			entry = append(entry, indexLine)
+		} else {
+			// avoid adding the same line twice in case of repeated trigrams
+			if entry[len(entry)-1] != indexLine {
+				entry = append(entry, indexLine)
+			}
+		}
+		index.tri[tri] = entry
+	}
+}
+`
+	index := NewIndex()
+	index.setFromLines(strings.Split(text, "\n"))
+
+	// for ngram, invLines := range index.inverted {
+	// 	printed_lines := map_slice(invLines, func(l InvertedLine) string { return l.String() })
+	// 	fmt.Printf("[%q] -> %s\n", ngram, strings.Join(slices.Collect(printed_lines), ", "))
+	// }
+
+	{
+		query_str := "entr"
+		matches := index.findSubstring(query_str).GroupByLine()
+
+		for lineNumber, match := range matches {
+			fmt.Printf("  line: [%d] %q\n", lineNumber, match.line.rawString)
+			fmt.Printf("    offs: %v\n", match.offsets)
+
+			parts_slice := map_slice(
+				slices.Collect(match.PartsIterator(query_str)),
+				func(part string) string { return fmt.Sprintf("[%q]", part) })
+
+			fmt.Printf("    parts: %v\n", strings.Join(parts_slice, ", "))
+		}
+	}
+
+	query_and_print_similarity := func(
+		query_str string,
+		simfunc SimilarityFunc,
+		sim_threshold float64,
+	) {
+		fmt.Printf("similar to %q\n", query_str)
+		matches := index.findSimilarLines(query_str, sim_threshold, simfunc)
+		for _, match := range slices.SortedFunc(
+			slices.Values(matches),
+			func(l, r SimilarLine) int { return int(math.Copysign(1.0, r.similarity-l.similarity)) },
+		) {
+			fmt.Printf("  [%.6f] %q\n", match.similarity, match.line.rawString)
+		}
+	}
+
+	// query_and_print_similarity("entr", ngram_multiset_similarity__jaccard, 0.01)
+	// query_and_print_similarity("entr", ngram_multiset_similarity__dguy, 0.09)
+	// query_and_print_similarity("index entry", ngram_multiset_similarity__dguy, 0.09)
+	// query_and_print_similarity("append entry to index", ngram_multiset_similarity__dguy, 0.09)
+	query_and_print_similarity("entr", ngram_slice_similarity__jaccard, 0.01)
+	query_and_print_similarity("entr", ngram_slice_similarity__dguy, 0.09)
+	query_and_print_similarity("index entry", ngram_slice_similarity__dguy, 0.09)
+	query_and_print_similarity("append entry to index", ngram_slice_similarity__dguy, 0.09)
+}

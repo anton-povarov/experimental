@@ -1,0 +1,56 @@
+goos: darwin
+goarch: arm64
+pkg: trigram_index/v2
+cpu: Apple M3 Pro
+BenchmarkTextSearch/query_"resul"-12         	 3124532	       387.5 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"resul"-12         	 3574899	       349.7 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"resul"-12         	 3878800	       320.4 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"resul"-12         	 3844854	       311.8 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"resul"-12         	 3902296	       308.4 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"resul"-12         	 3852416	       309.0 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"resul"-12         	 3889243	       310.3 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"resul"-12         	 3871436	       308.8 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"resul"-12         	 3870114	       309.5 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"resul"-12         	 3874855	       308.1 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"error"-12         	41980488	        28.55 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"error"-12         	41925180	        28.32 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"error"-12         	42338992	        28.53 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"error"-12         	41337556	        28.58 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"error"-12         	41951684	        28.58 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"error"-12         	41822654	        28.47 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"error"-12         	42378492	        28.55 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"error"-12         	41333166	        28.29 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"error"-12         	41718211	        28.57 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"error"-12         	41186572	        28.60 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"err"-12           	28349498	        42.77 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"err"-12           	29270908	        41.09 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"err"-12           	29255566	        41.10 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"err"-12           	28902458	        41.02 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"err"-12           	28855257	        41.23 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"err"-12           	25439223	        41.22 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"err"-12           	28855402	        41.21 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"err"-12           	29054576	        41.24 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"err"-12           	29209930	        40.99 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"err"-12           	29327065	        41.17 ns/op	      16 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 3642120	       367.0 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 4053402	       305.9 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 4011240	       297.7 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 4053733	       297.8 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 4030081	       296.5 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 3991276	       298.4 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 4003630	       298.0 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 4020794	       297.9 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 4026232	       298.2 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"index"-12         	 4037156	       297.2 ns/op	     704 B/op	       1 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	41597396	        28.96 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	40902118	        28.52 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	41421981	        28.46 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	42427750	        28.33 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	40908684	        28.66 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	41853650	        28.60 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	41893345	        28.65 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	41409237	        28.31 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	41991932	        28.59 ns/op	       0 B/op	       0 allocs/op
+BenchmarkTextSearch/query_"add_result_string_to_index_and_then_do_something_with_it"-12         	41514710	        28.28 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	trigram_index/v2	61.668s
