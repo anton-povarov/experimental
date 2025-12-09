@@ -10,7 +10,10 @@
 ### Above combination will ignore all files without extension (looking at you, binaries!) ###
 
 *.dSYM
+
+# golang profiles and test binaries
 *.prof
+*.test
 
 # cmake stuff
 build/
