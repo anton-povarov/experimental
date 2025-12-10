@@ -181,15 +181,18 @@ func minRemoveToMakeValid_optimistic(s string) string {
 	return string(out[:out_i])
 }
 
-// same as optimistic, but eagerly copy on forward pass and only go to the latest unmatched '(' on backward
-// this is good if the mismatched ')' are at the end, as is usually the case in programming
+// Same as optimistic, but eagerly copy on forward pass and only go to the latest unmatched '(' on backward.
+// the backward scan part is quite convoluted, as it needs to calculate where to write to at the end of the output.
+//
+// This approach is good if the mismatched ')' are at the end, as we'll sweep them out in the forward pass (!).
+// Such trailing hanging ')' are usually the case in programming.
 func minRemoveToMakeValid_optimistic_by_bytes(s string) string {
 	out := make([]byte, len(s))
 	out_i := 0
 
-	skipped := 0
-	counter := 0
-	start_i := 0
+	skipped := 0 // number of unmatched ')' skipped on the forward pass
+	counter := 0 // balance counter
+	start_i := 0 // the rightmost unmatched '('
 
 	for i := range len(s) {
 		switch s[i] {
@@ -237,6 +240,12 @@ func minRemoveToMakeValid_optimistic_by_bytes(s string) string {
 		out[out_i] = s[i]
 	}
 
+	// slice_hdr := (*struct {
+	// 	d   unsafe.Pointer
+	// 	len int
+	// 	cap int
+	// })(unsafe.Pointer(&out))
+	// return unsafe.String((*byte)(slice_hdr.d), out_end_i)
 	return string(out[:out_end_i])
 }
 
@@ -267,7 +276,7 @@ func minRemoveToMakeValid_optimistic_backward(s string) string {
 	}
 
 	// at this point s[:end_i] has a counter >= 0 (i.e. there is `counter` of unmatched closing parens)
-	// we're writing forward now, writing (end_i - counter) bytes
+	// do a forward pass now, writing (end_i - counter) bytes
 	// because we know we're going to be removing `counter` opening parens
 	out_i := out_end_i - (end_i - counter) // reserve space in the output buffer
 	out_begin_i := out_i                   // save, need this for return
@@ -350,7 +359,7 @@ var testData_normal = []tu.TestData[string, string]{
 	{Input: "", Expected: ""},
 }
 
-var testData_large = []tu.TestData[string, string]{
+var testData_trailing = []tu.TestData[string, string]{
 	{
 		Input:    "aaaa(aadknasl)d((kasn;dnqdknasd())qadlqns dad()))))))))))))))))))))))(())))))))))))))",
 		Expected: "aaaa(aadknasl)d((kasn;dnqdknasd())qadlqns dad())(())",
@@ -361,10 +370,10 @@ var testData_large = []tu.TestData[string, string]{
 	},
 }
 
-var testData_deep = []tu.TestData[string, string]{
+var testData_leading = []tu.TestData[string, string]{
 	{
-		Input:    "aaaa(aadknasl)d((kasn;dn(((((((((qdknasd())qadlqns dad()",
-		Expected: "aaaa(aadknasl)dkasn;dn(qdknasd())qadlqns dad()",
+		Input:    "((((((((((((((ab(((((aaa(aadknasl)d((kasn;dn(((((((((qdknasd())qadlqns dad()",
+		Expected: "abaaa(aadknasl)dkasn;dn(qdknasd())qadlqns dad()",
 	},
 }
 
@@ -377,8 +386,8 @@ var testData_cringe = []tu.TestData[string, string]{
 
 func TestMain(t *testing.T) {
 	var testData = testData_normal
-	testData = append(testData, testData_large...)
-	testData = append(testData, testData_deep...)
+	testData = append(testData, testData_trailing...)
+	testData = append(testData, testData_leading...)
 	testData = append(testData, testData_cringe...)
 
 	t.Run("forward_backward", func(t *testing.T) { tu.RunTest(t, minRemoveToMakeValid_forward_backward, testData) })
@@ -431,7 +440,7 @@ func BenchmarkLengthOfLastWord(b *testing.B) {
 	}
 
 	run_for_str("normal", testData_normal[0].Input)
-	run_for_str("large", testData_large[0].Input)
-	run_for_str("deep", testData_deep[0].Input)
+	run_for_str("leading", testData_leading[0].Input)
+	run_for_str("trailing", testData_trailing[0].Input)
 	run_for_str("cringe", testData_cringe[0].Input)
 }
