@@ -24,7 +24,7 @@ type TestData[T any, E any] struct {
 	Expected E
 }
 
-func RunTest[T any, E comparable](t *testing.T, testedFunc func(T) E, data []TestData[T, E]) {
+func RunTest[T any, E any](t *testing.T, testedFunc func(T) E, data []TestData[T, E]) {
 	green := color.New(color.FgGreen)
 	red := color.New(color.FgHiRed)
 
@@ -48,7 +48,7 @@ func RunTest[T any, E comparable](t *testing.T, testedFunc func(T) E, data []Tes
 	}
 
 	for i, d := range data {
-		if results[i] != d.Expected {
+		if !reflect.DeepEqual(results[i], d.Expected) {
 			t.FailNow()
 		}
 	}
