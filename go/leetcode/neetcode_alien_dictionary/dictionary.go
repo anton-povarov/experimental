@@ -1,4 +1,5 @@
 // https://neetcode.io/problems/foreign-dictionary/
+// https://leetcode.com/problems/alien-dictionary
 
 // This implementation uses a symbol dependency graph + DFS to reconstruct the alphabet
 //
@@ -110,11 +111,9 @@ func figureOutAlienAlphabet(dict []string) []string {
 		total_letters := 0 // total number of letters at this level
 		for _, str := range dict {
 			if prefix_len < len(str) {
-				prefix := ""
-				if prefix_len > 0 {
-					prefix = str[:prefix_len]
-				}
-				prefixes[prefix] = append(prefixes[prefix], str[prefix_len])
+				prefix := str[:prefix_len]
+				symbol := str[prefix_len]
+				prefixes[prefix] = append(prefixes[prefix], symbol)
 				total_letters++
 			}
 		}
