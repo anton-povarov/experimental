@@ -5,7 +5,9 @@ package main
 import (
 	tu "antoxa/leetcode/testutil"
 	"fmt"
+	"runtime/debug"
 	"slices"
+	"unsafe"
 
 	"testing"
 )
@@ -128,7 +130,8 @@ func minRemoveToMakeValid_single_pass(s string) string {
 // from there - we backward pass the tail and then another pass to reverse it
 // this approach should always be faster than backward_forward (but sometimes, by about 0)
 func minRemoveToMakeValid_optimistic(s string) string {
-	out := make([]byte, len(s))
+	// out := make([]byte, len(s))
+	out := unsafe.Slice((*byte)(mallocgc(uintptr(len(s)), nil, needszero_false)), len(s))
 	out_i := 0
 	start_i := 0
 	counter := 0
@@ -178,8 +181,23 @@ func minRemoveToMakeValid_optimistic(s string) string {
 
 		slices.Reverse(out[tmp_out_i:out_i])
 	}
-	return string(out[:out_i])
+
+	slice_hdr := (*struct {
+		d   unsafe.Pointer
+		len int
+		cap int
+	})(unsafe.Pointer(&out))
+	return unsafe.String((*byte)(slice_hdr.d), out_i)
+
+	// return string(out[:out_i])
 }
+
+//go:linkname mallocgc runtime.mallocgc
+func mallocgc(size uintptr, typ unsafe.Pointer, needszero uintptr) unsafe.Pointer
+
+var needszero_false = uintptr(0)
+
+func b2u(b bool) uint8 { return *(*uint8)(unsafe.Pointer(&b)) }
 
 // Same as optimistic, but eagerly copy on forward pass and only go to the latest unmatched '(' on backward.
 // the backward scan part is quite convoluted, as it needs to calculate where to write to at the end of the output.
@@ -187,7 +205,9 @@ func minRemoveToMakeValid_optimistic(s string) string {
 // This approach is good if the mismatched ')' are at the end, as we'll sweep them out in the forward pass (!).
 // Such trailing hanging ')' are usually the case in programming.
 func minRemoveToMakeValid_optimistic_by_bytes(s string) string {
-	out := make([]byte, len(s))
+
+	// the only reason for this chicanery is to avoid zeroing memory that we're going to overwrite anyway
+	out := unsafe.Slice((*byte)(mallocgc(uintptr(len(s)), nil, needszero_false)), len(s))
 	out_i := 0
 
 	skipped := 0 // number of unmatched ')' skipped on the forward pass
@@ -221,7 +241,7 @@ func minRemoveToMakeValid_optimistic_by_bytes(s string) string {
 
 	remaining_len := len(s) - start_i - counter
 	out_end_i := start_i - skipped + remaining_len
-	out_i = out_end_i
+	out_i = out_end_i - 1
 
 	// fmt.Printf("remaining = %d, out_i = %d\n", remaining_len, out_i)
 
@@ -236,17 +256,17 @@ func minRemoveToMakeValid_optimistic_by_bytes(s string) string {
 		case ')':
 			counter++
 		}
-		out_i--
 		out[out_i] = s[i]
+		out_i--
 	}
 
-	// slice_hdr := (*struct {
-	// 	d   unsafe.Pointer
-	// 	len int
-	// 	cap int
-	// })(unsafe.Pointer(&out))
-	// return unsafe.String((*byte)(slice_hdr.d), out_end_i)
-	return string(out[:out_end_i])
+	slice_hdr := (*struct {
+		d   unsafe.Pointer
+		len int
+		cap int
+	})(unsafe.Pointer(&out))
+	return unsafe.String((*byte)(slice_hdr.d), out_end_i)
+	// return string(out[:out_end_i])
 }
 
 // same as optimistic, but backward pass first
@@ -400,6 +420,9 @@ func TestMain(t *testing.T) {
 }
 
 func BenchmarkLengthOfLastWord(b *testing.B) {
+
+	debug.SetGCPercent(-1)
+	debug.SetMemoryLimit(-1)
 
 	run_for_str := func(name string, test_str string) {
 		b.Run(fmt.Sprintf("%s/f_b", name), func(b *testing.B) {
