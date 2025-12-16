@@ -67,7 +67,7 @@ SortIncludes: true # Automatically sort includes within groups
 
 # --- Alignments ---
 AlignConsecutiveDeclarations: Consecutive # aligns struct members and function decls
-AlignArrayOfStructures: Right # aligns struct initializers
+AlignArrayOfStructures: Left # aligns struct initializers
 AlignConsecutiveAssignments:
   Enabled: false
   AcrossEmptyLines: false
