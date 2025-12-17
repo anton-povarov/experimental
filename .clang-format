@@ -15,7 +15,7 @@ AlignAfterOpenBracket: Align # Align continued parameters and arguments vertical
 
 # --- Braces and Layout ---
 AllowShortBlocksOnASingleLine: Never # Never collapse braces for blocks to one line
-AllowShortFunctionsOnASingleLine: InlineOnly # Allow short inline functions on one line
+AllowShortFunctionsOnASingleLine: false # Don't allow short inline functions on one line
 AllowShortIfStatementsOnASingleLine: Never # Never allow single-line ifs
 AllowShortLoopsOnASingleLine: false # Multi-line loops only, for clarity
 # BreakBeforeBraces: Mozilla # complicated, see
