@@ -9,11 +9,15 @@
 
 ### Above combination will ignore all files without extension (looking at you, binaries!) ###
 
+.DS_Store
 *.dSYM
 
 # golang profiles and test binaries
 *.prof
 *.test
+
+# rust
+target/
 
 # cmake stuff
 build/
