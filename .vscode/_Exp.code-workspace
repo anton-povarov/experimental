@@ -6,16 +6,10 @@
     {
       "path": "../../meow",
     },
-    {
-      "path": "../../libmdbx-c",
-    },
-    {
-      "path": "../../rds",
-    },
   ],
   "settings": {
     "rust-analyzer.linkedProjects": [
-      "rs/hw/Cargo.toml",
+      "rs/tmp/Cargo.toml",
       "rs/lists/Cargo.toml",
       "rs/lc78_subsets/Cargo.toml",
     ],

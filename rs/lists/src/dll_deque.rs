@@ -422,6 +422,5 @@ mod test {
         list.push_back(4);
 
         println!("{:?}", list);
-        println!("{}", list);
     }
 }
