@@ -6,34 +6,65 @@ import (
 	"fmt"
 	"math/bits"
 	"slices"
+	"strings"
 )
 
-type bitmask uint64
+const bitmask_size = 256
+const bitmask_block_size = 64
+const bitmask_blocks_count = bitmask_size / bitmask_block_size
+
+type bitmask struct {
+	b [bitmask_blocks_count]uint64
+}
 
 func (b bitmask) String() string {
-	return fmt.Sprintf("%064b", uint64(b))
+	sb := strings.Builder{}
+	for i := range bitmask_blocks_count {
+		if i != 0 {
+			sb.WriteByte(' ')
+		}
+		fmt.Fprintf(&sb, "%#x", b.b[i])
+	}
+	return sb.String()
 }
 
-type Node struct {
-	prefix string
-	child  *Trie
+func (b *bitmask) check_bit_is_in_range(bit int, name string) {
+	if 0 > bit || bit >= bitmask_size {
+		panic(fmt.Sprintf("bitmask::%s bit (=%d) must be in [0, %d)", name, bit, bitmask_size))
+	}
 }
 
-// Trie is a radix trie with path compression
-// Trie only supports alphanumeric keys (i.e. [a-zA-Z0-9]+)
-type Trie struct {
-	// nodeMask contains a bit per any possible starting char of the prefix
-	// we expect only alphanumeric characters (there's 26 + 26 + 10 = 62 of them)
-	// we have 64 bits total in [nodeMask]
-	// (bit 63) is used for empty string
-	// (bit 62) is reserved for now
-	// (bits 0-61) are used for alphanumeric character prefixes
-	nodeMask bitmask
+func (b *bitmask) Set(bit int) *bitmask {
+	b.check_bit_is_in_range(bit, "Set")
+	b.b[bit/bitmask_block_size] |= uint64(1 << (bit % bitmask_block_size))
+	return b
+}
 
-	// child nodes of this trie, we do NOT allocate array of size for all possible prefixes
-	// instead we allocate only the nodes that are present and address them via the nodeMask
-	// see the [getInsertBitAndOffset] method
-	nodes []Node
+func (b *bitmask) Reset(bit int) *bitmask {
+	b.check_bit_is_in_range(bit, "Reset")
+	b.b[bit/bitmask_block_size] &= ^uint64(1 << (bit % bitmask_block_size))
+	return b
+}
+
+func (b *bitmask) IsSet(bit int) bool {
+	b.check_bit_is_in_range(bit, "IsSet")
+	return (b.b[bit/bitmask_block_size] & uint64(1<<(bit%bitmask_block_size))) != 0
+}
+
+func (b *bitmask) CountOnesBelowBit(bit int) (n_bits_set int, this_bit_set bool) {
+	b.check_bit_is_in_range(bit, "CountOnesBelowBit")
+
+	bit_chunk := bit / bitmask_block_size
+	bit_offset := bit % bitmask_block_size
+
+	for i := range bit_chunk {
+		n_bits_set += bits.OnesCount64(b.b[i])
+	}
+
+	mask := uint64((1 << bit_offset) - 1)
+	n_bits_set += bits.OnesCount64(b.b[bit_chunk] & mask)
+	this_bit_set = (b.b[bit_chunk] & (1 << bit_offset)) != 0
+	return
 }
 
 func commonPrefix(s1, s2 string) string {
@@ -49,39 +80,75 @@ func commonPrefix(s1, s2 string) string {
 	return s1[:i]
 }
 
-func Constructor() Trie {
-	return Trie{}
+func trieKeysConcat(l, r string) string {
+	return l + r
+}
+
+type trieNode[V any] struct {
+	prefix string
+	child  *Trie[V]
+}
+
+// Trie is a radix trie with path compression
+type Trie[V any] struct {
+	// nodeMask - a bitmask of nodes present in the [nodes] array
+	// this allows to avoid storing child nodes (or pointers to them) unless they're actually used
+	// the tradeoff is that when nodes are inserted/removed - all nodes must be shifted in the [nodes] array
+	// at high node density, this would probably perform worse than just storing all nodes directly
+	// Trie stores empty prefixes as nodes, so:
+	//  if [node.prefix] == "" -> no bits are set, node will always be at the end of [nodes]
+	nodeMask bitmask
+
+	// child nodes of this trie, we do NOT allocate array of size for all possible prefixes
+	// instead we allocate only the nodes that are present and address them via the nodeMask
+	// see the [getInsertBitAndOffset] method
+	nodes []trieNode[V]
+}
+
+func New[V any]() *Trie[V] {
+	return &Trie[V]{}
+}
+
+func Constructor[V any]() Trie[V] {
+	return Trie[V]{}
 }
 
 // getInsertBitAndOffset returns (based on prefix)
 // 1. position of the bit in this.nodeMask
 // 2. offset in the nodes array to insert into
 // 3. is the bit in this.nodeMask already set
-func (this *Trie) getInsertBitAndOffset(prefix string) (bit int, offset int, is_set bool) {
-	if prefix == "" {
-		bit = 63
+func (this *Trie[V]) getInsertBitAndOffset(prefix string) (bit int, offset int, is_set bool) {
+	if len(prefix) == 0 {
+		panic("getInsertBitAndOffset called for empty prefix")
 	} else {
-		c := prefix[0]
-		if '0' <= c && c <= '9' {
-			bit = int(c - '0')
-		} else if 'A' <= c && c <= 'Z' {
-			bit = int(10 + c - 'A')
-		} else if 'a' <= c && c <= 'z' {
-			bit = int(10 + 26 + c - 'a')
-		} else {
-			panic("trie: unexpected character in key")
-		}
+		bit = int(prefix[0])
+		// c := prefix[0]
+		// if '0' <= c && c <= '9' {
+		// 	bit = int(c - '0')
+		// } else if 'A' <= c && c <= 'Z' {
+		// 	bit = int(10 + c - 'A')
+		// } else if 'a' <= c && c <= 'z' {
+		// 	bit = int(10 + 26 + c - 'a')
+		// } else {
+		// 	panic("trie: unexpected character in key")
+		// }
 	}
 
-	// [bit] number of 1-s, i.e. for bit == 5 => 0000...00011111
-	// the idea is to remove all bits higher than [bit],
-	//  to count how many elements should be in front of this one
-	mask := uint64((1 << bit) - 1)
-	offset = bits.OnesCount64(uint64(this.nodeMask) & mask)
-	return bit, offset, (this.nodeMask & (1 << bit)) != 0
+	offset, is_set = this.nodeMask.CountOnesBelowBit(bit)
+	return bit, offset, is_set
 }
 
-func (this *Trie) getNodeForPrefix(prefix string) (node *Node) {
+func (this *Trie[V]) getNodeForPrefix(prefix string) *trieNode[V] {
+	if len(prefix) == 0 {
+		if len(this.nodes) > 0 {
+			node := &this.nodes[len(this.nodes)-1]
+			if len(node.prefix) == 0 {
+				return node
+			}
+		}
+		return nil
+	}
+
 	_, offset, is_set := this.getInsertBitAndOffset(prefix)
 	if is_set {
 		return &this.nodes[offset]
@@ -89,95 +156,122 @@ func (this *Trie) getNodeForPrefix(prefix string) (node *Node) {
 	return nil
 }
 
-func (this *Trie) insertNode(node Node) {
+func (this *Trie[V]) insertNode(node trieNode[V]) {
+	if len(node.prefix) == 0 {
+		if len(this.nodes) > 0 {
+			if len(this.nodes[len(this.nodes)-1].prefix) == 0 {
+				panic("insertNode: empty-string slot must not be present before insertion")
+			}
+		}
+		this.nodes = append(this.nodes, node)
+		return
+	}
+
+	if len(this.nodes) == 0 {
+		bit := int(node.prefix[0])
+		this.nodeMask.Set(bit)
+		this.nodes = append(this.nodes, node)
+		return
+	}
+
 	bit, offset, is_set := this.getInsertBitAndOffset(node.prefix)
 	if is_set {
 		panic("insertNode: slot must be empty before insertion")
 	}
-	this.nodeMask |= (1 << bit)
+	this.nodeMask.Set(bit)
 	this.nodes = slices.Insert(this.nodes, offset, node)
 }
 
-func (this *Trie) removeNode(node *Node) {
+func (this *Trie[V]) removeNode(node *trieNode[V]) {
+	if len(node.prefix) == 0 {
+		if len(this.nodes) > 0 {
+			if len(this.nodes[len(this.nodes)-1].prefix) != 0 {
+				panic("removeNode: removing empty-string node, but last node is not empty-string")
+			}
+		}
+		this.nodes = this.nodes[:len(this.nodes)-1]
+		return
+	}
+
 	bit, offset, is_set := this.getInsertBitAndOffset(node.prefix)
 	if !is_set {
-		panic("insertNode: slot must be filled before removal")
+		panic("removeNode: slot must be filled before removal")
 	}
-	this.nodeMask &= ^(1 << bit)
+	this.nodeMask.Reset(bit)
 	this.nodes = slices.Delete(this.nodes, offset, offset+1)
 }
 
-func (this *Trie) Insert(word string) {
-	// fmt.Printf("inserting %q", word)
+func (this *Trie[V]) Insert(word string) {
 
-	node := this.getNodeForPrefix(word)
-	// if node != nil {
-	// 	fmt.Printf(" -> node: { %q, %p }\n", node.prefix, node.child)
-	// } else {
-	// 	fmt.Printf(" -> [not set]\n")
-	// }
-
-	if node == nil {
-		this.insertNode(Node{prefix: word, child: nil})
-		return
-	}
-
-	prefix := commonPrefix(word, node.prefix)
-	word_suffix := word[len(prefix):]
-	node_suffix := node.prefix[len(prefix):]
-
-	// this [node.prefix] is a full prefix of [word]
-	// so it's likely we'd need to recurse into the child node to continue the search
-	if node_suffix == "" {
-		if word_suffix == "" { // [node.prefix] == [word]
-			if node.child == nil { // leaf node, full match, already exists
-				return
-			}
-
-			// non-leaf node, continue inserting, even though empty
-			node.child.Insert(word_suffix)
-		} else {
-			// [word......................)
-			//                [word_suffix)
-			// [node.prefix...)
-
-			// convert the node from leaf to branch, inserting empty string terminator
-			if node.child == nil {
-				node.child = &Trie{}
-				node.child.insertNode(Node{prefix: "", child: nil})
-			}
-
-			node.child.Insert(word_suffix)
+	for {
+		node := this.getNodeForPrefix(word)
+		if node == nil {
+			this.insertNode(trieNode[V]{prefix: word, child: nil})
+			return
 		}
 
+		prefix := commonPrefix(word, node.prefix)
+		word_suffix := word[len(prefix):]
+		node_suffix := node.prefix[len(prefix):]
+
+		// this [node.prefix] is a full prefix of [word]
+		// so it's likely we'd need to recurse into the child node to continue the search
+		if len(node_suffix) == 0 {
+			if len(word_suffix) == 0 { // [node.prefix] == [word]
+				if node.child == nil { // leaf node, full match, already exists
+					return
+				}
+
+				// non-leaf node, continue inserting, even though empty
+				// node.child.Insert(word_suffix)
+			} else {
+				// [word......................)
+				//                [word_suffix)
+				// [node.prefix...)
+
+				// convert the node from leaf to branch, inserting empty string terminator
+				if node.child == nil {
+					node.child = &Trie[V]{}
+					node.child.insertNode(trieNode[V]{prefix: "", child: nil})
+				}
+
+				// node.child.Insert(word_suffix)
+			}
+
+			// ITERATIVE part
+			word = word_suffix
+			this = node.child
+			continue
+
+			// return
+		}
+
+		// now we can be in a combination of these orthogonal cases
+		// 1. word_suffix is empty or not
+		// 2. node is leaf or branch
+		//
+		//   [word....)
+		//            [????)     <-- word_suffix is empty OR not empty
+		//   [prefix..)
+		//            [.......)  <-- node_suffix is NOT empty
+		//   [node.prefix.....)
+		//
+		// Turns out we don't care about any of those, we can deal with them generically.
+
+		// split the node into [prefix] -> [node_suffix] -> [preserve whatever child was there]
+		// insert the remaining current [word_suffix] under the new [prefix] node as well
+		node.prefix = prefix
+		node.child = func() *Trie[V] { // wrapped to preserve the current node.child
+			new_child := &Trie[V]{}
+			new_child.insertNode(trieNode[V]{prefix: node_suffix, child: node.child})
+			new_child.insertNode(trieNode[V]{prefix: word_suffix, child: nil})
+			return new_child
+		}()
 		return
 	}
-
-	// now we can be in a combination of these orthogonal cases
-	// 1. word_suffix is empty or not
-	// 2. node is leaf or branch
-	//
-	//   [word....)
-	//            [????)     <-- word_suffix is empty OR not empty
-	//   [prefix..)
-	//            [.......)  <-- node_suffix is NOT empty
-	//   [node.prefix.....)
-	//
-	// Turns out we don't care about any of those, we can deal with them generically.
-
-	// split the node into [prefix] -> [node_suffix] -> [preserve whatever child was there]
-	// insert the remaining current [word_suffix] under the new [prefix] node as well
-	node.prefix = prefix
-	node.child = func() *Trie { // wrapped to preserve the current node.child
-		new_child := &Trie{}
-		new_child.insertNode(Node{prefix: node_suffix, child: node.child})
-		new_child.insertNode(Node{prefix: word_suffix, child: nil})
-		return new_child
-	}()
-
 }
 
-func (this *Trie) RemovePrefix(word string) bool {
+func (this *Trie[V]) RemovePrefix(word string) bool {
 	node := this.getNodeForPrefix(word)
 	if node == nil {
 		return false
@@ -187,12 +281,12 @@ func (this *Trie) RemovePrefix(word string) bool {
 	word_suffix := word[len(prefix):]
 	node_suffix := node.prefix[len(prefix):]
 
-	if word_suffix == "" { // [word] is a prefix of [node.prefix]
+	if len(word_suffix) == 0 { // [word] is a prefix of [node.prefix]
 		this.removeNode(node)
 		return true
 	}
 
-	if node_suffix != "" { // suffixes have diverged
+	if len(node_suffix) != 0 { // suffixes have diverged
 		return false
 	}
 
@@ -208,14 +302,14 @@ func (this *Trie) RemovePrefix(word string) bool {
 		}
 		if len(node.child.nodes) == 1 {
 			child_node := node.child.nodes[0]
-			node.prefix += child_node.prefix
+			node.prefix = trieKeysConcat(node.prefix, child_node.prefix)
 			node.child = child_node.child
 		}
 	}
 	return removed_in_child
 }
 
-func (this *Trie) Remove(word string) bool {
+func (this *Trie[V]) Remove(word string) bool {
 	node := this.getNodeForPrefix(word)
 	if node == nil {
 		return false
@@ -225,15 +319,16 @@ func (this *Trie) Remove(word string) bool {
 	word_suffix := word[len(prefix):]
 	node_suffix := node.prefix[len(prefix):]
 
-	if node_suffix != "" { // node is there, but it contains something else
+	if len(node_suffix) != 0 { // node is there, but it contains something else
 		return false
 	}
 
 	if node.child == nil { // we're at leaf, can't recurse -> check for full match
-		if word_suffix == "" {
+		if len(word_suffix) == 0 {
 			this.removeNode(node)
 			return true
 		}
+		return false
 	}
 
 	removed_in_child := node.child.Remove(word_suffix)
@@ -244,14 +339,14 @@ func (this *Trie) Remove(word string) bool {
 		}
 		if len(node.child.nodes) == 1 {
 			child_node := node.child.nodes[0]
-			node.prefix += child_node.prefix
+			node.prefix = trieKeysConcat(node.prefix, child_node.prefix)
 			node.child = child_node.child
 		}
 	}
 	return removed_in_child
 }
 
-func (this *Trie) Search(word string) bool {
+func (this *Trie[V]) Search(word string) bool {
 	node := this.getNodeForPrefix(word)
 	if node == nil {
 		return false
@@ -261,18 +356,18 @@ func (this *Trie) Search(word string) bool {
 	word_suffix := word[len(prefix):]
 	node_suffix := node.prefix[len(prefix):]
 
-	if node_suffix != "" { // node is there, but it contains something else
+	if len(node_suffix) != 0 { // node is there, but it contains something else
 		return false
 	}
 
 	if node.child == nil { // we're at leaf, can't recurse -> check for full match
-		return word_suffix == "" // true if [word] == [node.prefix]
+		return len(word_suffix) == 0 // true if [word] == [node.prefix]
 	}
 
 	return node.child.Search(word_suffix)
 }
 
-func (this *Trie) StartsWith(word string) bool {
+func (this *Trie[V]) StartsWith(word string) bool {
 	node := this.getNodeForPrefix(word)
 	if node == nil {
 		return false
@@ -282,11 +377,11 @@ func (this *Trie) StartsWith(word string) bool {
 	word_suffix := word[len(prefix):]
 	node_suffix := node.prefix[len(prefix):]
 
-	if word_suffix == "" { // [word] is a prefix of [node.prefix]
+	if len(word_suffix) == 0 { // [word] is a prefix of [node.prefix]
 		return true
 	}
 
-	if node_suffix != "" { // suffixes have diverged
+	if len(node_suffix) != 0 { // suffixes have diverged
 		return false
 	}
 

@@ -37,28 +37,26 @@ func RunTest[T any, E any](t *testing.T, testedFunc func(T) E, data []TestData[T
 	green := color.New(color.FgGreen)
 	red := color.New(color.FgHiRed)
 
-	results := make([]E, len(data))
-
-	for i, d := range data {
+	for _, d := range data {
 		result := testedFunc(do_deepcopy(d.Input))
-		results[i] = result
+
+		test_ok := reflect.DeepEqual(result, d.Expected)
+		if !test_ok {
+			t.Fail()
+		}
 
 		clr := func() *color.Color {
-			if reflect.DeepEqual(result, d.Expected) {
+			if test_ok {
 				return green
 			}
 			return red
 		}()
 
-		clr.EnableColor() // this is required as go test does shenanigans with colored output
-		fmt.Fprintln(t.Output(),
-			clr.Sprintf("[%s] %#v -> %#v, expected: %#v", isOKStr(result, d.Expected), d.Input, result, d.Expected))
-		clr.DisableColor()
-	}
-
-	for i, d := range data {
-		if !reflect.DeepEqual(results[i], d.Expected) {
-			t.FailNow()
+		if !test_ok || testing.Verbose() {
+			clr.EnableColor() // this is required as go test does shenanigans with colored output
+			fmt.Fprintln(t.Output(),
+				clr.Sprintf("[%s] %#v -> %#v, expected: %#v", isOKStr(result, d.Expected), d.Input, result, d.Expected))
+			clr.DisableColor()
 		}
 	}
 }
@@ -73,29 +71,27 @@ func RunTest2[T1 any, T2 any, E any](t *testing.T, testedFunc func(T1, T2) E, da
 	green := color.New(color.FgGreen)
 	red := color.New(color.FgHiRed)
 
-	results := make([]E, len(data))
-
-	for i, d := range data {
+	for _, d := range data {
 		result := testedFunc(do_deepcopy(d.Input1), do_deepcopy(d.Input2))
-		results[i] = result
+
+		test_ok := reflect.DeepEqual(result, d.Expected)
+		if !test_ok {
+			t.Fail()
+		}
 
 		clr := func() *color.Color {
-			if reflect.DeepEqual(result, d.Expected) {
+			if test_ok {
 				return green
 			}
 			return red
 		}()
 
-		clr.EnableColor() // this is required as go test does shenanigans with colored output
-		fmt.Fprintln(t.Output(),
-			clr.Sprintf("[%s] (%#v, %#v) -> %#v, expected: %#v",
-				isOKStr(result, d.Expected), d.Input1, d.Input2, result, d.Expected))
-		clr.DisableColor()
-	}
-
-	for i, d := range data {
-		if !reflect.DeepEqual(results[i], d.Expected) {
-			t.FailNow()
+		if !test_ok || testing.Verbose() {
+			clr.EnableColor() // this is required as go test does shenanigans with colored output
+			fmt.Fprintln(t.Output(),
+				clr.Sprintf("[%s] (%#v, %#v) -> %#v, expected: %#v",
+					isOKStr(result, d.Expected), d.Input1, d.Input2, result, d.Expected))
+			clr.DisableColor()
 		}
 	}
 }

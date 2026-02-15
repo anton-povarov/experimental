@@ -31,7 +31,7 @@ constexpr void print_is_lock_free_helper()
 	if constexpr (min_align <= max_align) {
 		constexpr size_t align = (min_align);
 		auto             b = std::atomic<typename make_aligned_u128<align>::type>::is_always_lock_free;
-		std::print("  align {}:\t {}\n", align, b);
+		std::print("  align {}\t {}\n", align, b);
 	}
 
 	if constexpr (min_align < max_align) {
@@ -59,6 +59,7 @@ int main()
 
 	// cas loop to increment a composite my uint128
 	{
+		std::println("increment a composite my_uint128");
 		using type_t = make_aligned_u128<16>::type;
 		using atomic_t = std::atomic<type_t>;
 		atomic_t value{
@@ -68,28 +69,36 @@ int main()
 		type_t curr{}; // this is not equal to value so at least one CAS will fail, 2 iterations expected
 		type_t curr_new{};
 		do {
-			std::println("CAS loop, curr = {{ {}, {} }}", curr.hi, curr.lo);
+			std::println("  CAS loop, curr = {{ {}, {} }}", curr.hi, curr.lo);
 			curr_new = {curr.hi, curr.lo + 1};
 		} while (!value.compare_exchange_weak(curr, curr_new, std::memory_order_release,
 		                                      std::memory_order_relaxed));
 
 		curr = value.load(std::memory_order_relaxed);
-		std::println("final value = {{ {}, {} }}", curr.hi, curr.lo);
+		std::println("  final value = {{ {}, {} }}", curr.hi, curr.lo);
+		std::println();
 	}
 
-	// incrementing even the builtin __uint128_t is different between clang and gcc
+	// incrementing builtin extension __uint128_t requires an explicit CAS in clang/gcc (except apple clang, hehe)
 	{
-		alignas(128) std::atomic<__uint128_t> v{1};
-#ifdef __clang__
-		v.fetch_add(1, std::memory_order_relaxed);
-		std::println("clang incremented = {}", v.load());
-#elif defined(__GNUC__) && !defined(__clang__)
-		__uint128_t expected = v.load(std::memory_order_relaxed);
-		while (!v.compare_exchange_weak(expected, expected + 1, std::memory_order_relaxed,
-		                                std::memory_order_relaxed))
-			;
-		std::println("gcc incremented = {}", v.load());
-#endif
+		std::println("increment builtin __int128_t");
+
+		auto const increment_multi = [](__int128_t initial, size_t iterations) {
+			alignas(128) std::atomic<__int128_t> v{initial};
+
+			__int128_t expected = v.load(std::memory_order_relaxed);
+			for (size_t i = 0; i < iterations; i++) {
+				while (!v.compare_exchange_weak(expected, expected + 1, std::memory_order_relaxed,
+				                                std::memory_order_relaxed))
+					;
+			}
+
+			std::println("  {} iterations\t {} -> {}", iterations, initial, v.load());
+		};
+
+		increment_multi(1, 1);
+		increment_multi(1, 25);
+		increment_multi(-1, 25);
 	}
 
 	return 0;

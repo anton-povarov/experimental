@@ -3,156 +3,146 @@
 package main
 
 import (
-	"fmt"
+	tu "antoxa/leetcode/testutil"
+	"reflect"
 	"testing"
 
 	"github.com/k0kubun/pp"
 )
 
-func TestTrie(t *testing.T) {
-	{
-		trie := Constructor()
-		trie.Insert("hello")
-		trie.Insert("world")
-		pp.Println(trie)
+func makeTrie(keys []string) *Trie[int] {
+	trie := Constructor[int]()
+	trie.testutil_Insert(keys)
+	return &trie
+}
+
+func (trie *Trie[V]) testutil_Insert(keys []string) *Trie[V] {
+	for _, k := range keys {
+		trie.Insert(k)
 	}
-	{
-		trie := Constructor()
-		trie.Insert("hello")
-		trie.Insert("world")
-		trie.Insert("hell")
-		pp.Println(trie)
+	return trie
+}
+
+func (trie *Trie[V]) testutil_Remove(keys []string) *Trie[V] {
+	for _, k := range keys {
+		trie.Remove(k)
 	}
-	{
-		trie := Constructor()
-		trie.Insert("hello")
-		trie.Insert("world")
-		trie.Insert("hell")
-		trie.Insert("hey")
-		trie.Insert("hey")
-		trie.Insert("hey")
-		trie.Insert("imhavingalotoffun")
-		trie.Insert("ibrahim")
-		pp.Println(trie)
+	return trie
+}
+
+func (trie *Trie[V]) testutil_RemovePrefix(keys []string) *Trie[V] {
+	for _, k := range keys {
+		trie.RemovePrefix(k)
+	}
+	return trie
+}
+
+func mustDeepEqual[V any](t *testing.T, trie, expected *Trie[V]) {
+	if reflect.DeepEqual(expected, trie) == false {
+		t.Errorf("trie != expected")
+		pp.Printf("trie\n%v\n", trie)
+		pp.Printf("expected\n%v\n", expected)
+		t.FailNow()
 	}
 }
 
 func TestSearch(t *testing.T) {
-	trie := Constructor()
-	trie.Insert("hello")
-	trie.Insert("world")
-	trie.Insert("hell")
+	trie := makeTrie([]string{"hello", "world", "hell", "hey"})
 	trie.Insert("hey")
-	trie.Insert("hey")
-	trie.Insert("hey")
-	pp.Println(trie)
-	fmt.Printf("%q -> %v, expected: %v\n", "hell", trie.Search("hell"), true)
-	fmt.Printf("%q -> %v, expected: %v\n", "hel", trie.Search("hel"), false)
-	fmt.Printf("%q -> %v, expected: %v\n", "hellowa", trie.Search("hellowa"), false)
+	trie.Insert("hey") // must not fail multiple inserts of the same string
+
+	testData := []tu.TestData[string, bool]{
+		{Input: "hell", Expected: true},
+		{Input: "hel", Expected: false},
+		{Input: "hellowa", Expected: false},
+	}
+	tu.RunTest(t, func(s string) bool { return trie.Search(s) }, testData)
 }
 
 func TestStartsWith(t *testing.T) {
-	trie := Constructor()
-	trie.Insert("hello")
-	trie.Insert("world")
-	trie.Insert("hell")
-	trie.Insert("hey")
-	pp.Println(trie)
-	fmt.Printf("%q -> %v, expected: %v\n", "hello", trie.StartsWith("hello"), true)
-	fmt.Printf("%q -> %v, expected: %v\n", "hell", trie.StartsWith("hell"), true)
-	fmt.Printf("%q -> %v, expected: %v\n", "hel", trie.StartsWith("hel"), true)
-	fmt.Printf("%q -> %v, expected: %v\n", "hey", trie.StartsWith("hey"), true)
-	fmt.Printf("%q -> %v, expected: %v\n", "he", trie.StartsWith("he"), true)
-	fmt.Printf("%q -> %v, expected: %v\n", "her", trie.StartsWith("her"), false)
+	trie := makeTrie([]string{"hello", "world", "hell", "hey", "imhavinglotsafun", "imhavingloz", "imho"})
+
+	testData := []tu.TestData[string, bool]{
+		{Input: "hello", Expected: true},
+		{Input: "hell", Expected: true},
+		{Input: "hel", Expected: true},
+		{Input: "hey", Expected: true},
+		{Input: "he", Expected: true},
+		{Input: "her", Expected: false},
+		{Input: "hellowa", Expected: false},
+		{Input: "imhaving", Expected: true},
+		{Input: "imhavinglot", Expected: true},
+		{Input: "imhavinglog", Expected: false},
+		{Input: "imhavinglozz", Expected: false},
+		{Input: "imh", Expected: true},
+	}
+	tu.RunTest(t, func(s string) bool { return trie.StartsWith(s) }, testData)
 }
 
 func TestRemovePrefix(t *testing.T) {
-	{
-		trie := Constructor()
-		trie.Insert("hello")
-		trie.Insert("world")
-		trie.Insert("hell")
-		trie.Insert("hey")
-		trie.Insert("hey")
-		trie.Insert("hey")
-		trie.Insert("imhavingalotoffun")
-		trie.Insert("ibrahim")
-		pp.Printf("before\n%v\n", trie)
-
-		trie.RemovePrefix("hel")
-		pp.Printf("after\n%v\n", trie)
-	}
-}
-
-func TestRemovePrefix2(t *testing.T) {
-	{
-		trie := Constructor()
-		trie.Insert("hello")
-		trie.Insert("world")
-		trie.Insert("hell")
-		trie.Insert("hey")
-		trie.Insert("imhavingalotoffun")
-		trie.Insert("ibrahim")
-		pp.Printf("before\n%v\n", trie)
-
+	testData := []tu.TestData2[[]string, []string, *Trie[int]]{
+		{
+			Input1:   []string{"hello", "world", "hell", "hey", "hey", "hey", "imhavingalotoffun", "ibrahim"},
+			Input2:   []string{"hel"},
+			Expected: makeTrie([]string{"world", "hey", "imhavingalotoffun", "ibrahim"}),
+		},
+		//
 		// path compress from
 		// "he" -> ["ll", "y"] -> [["o", ""], []]
 		// to
 		// "he" -> ["ll", "y"]
-		trie.RemovePrefix("hello")
-		pp.Printf("after\n%v\n", trie)
+		{
+			Input1:   []string{"hello", "world", "hell", "hey", "hey", "hey", "imhavingalotoffun", "ibrahim"},
+			Input2:   []string{"hello"},
+			Expected: makeTrie([]string{"world", "hell", "hey", "imhavingalotoffun", "ibrahim"}),
+		},
+		//
+		// removing "hey", should path compress "hello" and "hell" into one node again
+		// i.e. from
+		// "he" -> ["ll", "y"] -> [["", "o"], [nonexistent, as "y" is a leaf]]
+		// to
+		// "hell" -> ["", "o"]
+		{
+			Input1:   []string{"hello", "world", "hell", "hey", "hey", "hey", "imhavingalotoffun", "ibrahim"},
+			Input2:   []string{"hey"},
+			Expected: makeTrie([]string{"hello", "world", "hell", "imhavingalotoffun", "ibrahim"}),
+		},
+		// alternative path compression
+		{
+			Input1:   []string{"hello", "world", "hey", "heya"},
+			Input2:   []string{"hey"},
+			Expected: makeTrie([]string{"hello", "world"}),
+		},
 	}
-}
-
-func TestRemovePrefix3(t *testing.T) {
-	trie := Constructor()
-	trie.Insert("hello")
-	trie.Insert("world")
-	trie.Insert("hell")
-	trie.Insert("hey")
-	trie.Insert("imhavingalotoffun")
-	trie.Insert("ibrahim")
-	pp.Printf("before\n%v\n", trie)
-
-	// removing hey, should path compress "hello" and "hell" into one node again
-	// i.e. from
-	// "he" -> ["ll", "y"] -> [["", "o"], [nonexistent, as "y" is a leaf]]
-	// to
-	// "hell" -> ["", "o"]
-	trie.RemovePrefix("hey")
-	pp.Printf("after\n%v\n", trie)
-}
-
-func TestRemovePrefix4(t *testing.T) {
-	trie := Constructor()
-	// trie.Insert("hello")
-	// trie.Insert("world")
-	trie.Insert("hey")
-	trie.Insert("heya")
-	pp.Printf("before\n%v\n", trie)
-
-	trie.RemovePrefix("hey")
-	pp.Printf("after\n%v\n", trie)
+	testFunc := func(ins, rem []string) *Trie[int] {
+		trie := makeTrie(ins)
+		trie.testutil_RemovePrefix(rem)
+		return trie
+	}
+	tu.RunTest2(t, testFunc, testData)
 }
 
 func TestRemove(t *testing.T) {
-	trie := Constructor()
-	trie.Insert("hello")
-	trie.Insert("world")
-	trie.Insert("hell")
-	trie.Insert("hey")
-	trie.Insert("heya")
-	pp.Printf("before\n%v\n", trie)
+	trie := makeTrie([]string{"hello", "world", "hell", "hey", "heya"})
+	trie.testutil_Remove([]string{"hell", "hey"})
 
-	trie.Remove("hell")
-	trie.Remove("hey")
-	pp.Printf("after\n%v\n", trie)
+	expected := makeTrie([]string{"hello", "world", "heya"})
+	mustDeepEqual(t, trie, expected)
+}
+
+func TestBinaryStrings(t *testing.T) {
+	trie := makeTrie([]string{"hello", "world", "hello\x00", "hello\x00wa"})
+	trie.Remove("hello\x00wa")
+	trie.Remove("hello\x00wa") // remove twice, must not segfault
+
+	expected := makeTrie([]string{"hello", "world", "hello\x00"})
+	mustDeepEqual(t, trie, expected)
 }
 
 func TestLeetcode1(t *testing.T) {
 	// ["Trie","insert","search","search","startsWith","startsWith","insert","search","startsWith","insert","search","startsWith"]
 	// [[],["ab"],["abc"],["ab"],["abc"],["ab"],["ab"],["abc"],["abc"],["abc"],["abc"],["abc"]]
-	trie := Constructor()
+	trie := Constructor[int]()
 
 	trie.Insert("ab")
 	if trie.Search("abc") != false {
