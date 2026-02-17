@@ -1,0 +1,7 @@
+# ignore things related to CMake and Ninja build system
+.ninja_*
+build.ninja
+./build*
+
+# clangd stuff
+.cache

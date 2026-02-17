@@ -10,5 +10,7 @@
     "vector": "cpp",
     "unordered_map": "cpp"
   },
-  "cmake.sourceDirectory": "/Users/antoxa/_Dev/_Exp/cpp/lc128_longest_consecutive_sequence"
+  "cmake.sourceDirectory": "/Users/antoxa/_Dev/_Exp/cpp/lc128_longest_consecutive_sequence",
+  "cmake.buildDirectory": "/Users/antoxa/_Dev/_Exp/cpp/lc128_longest_consecutive_sequence/build",
+  "cmake.configureArgs": ["-DMEOW_ROOT=/Users/antoxa/_Dev/meow", "--fresh"]
 }

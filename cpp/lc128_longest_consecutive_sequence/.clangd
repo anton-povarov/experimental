@@ -1,0 +1,12 @@
+InlayHints:
+  BlockEnd: false
+  Designators: false
+  Enabled: true
+  ParameterNames: true
+  DeducedTypes: true
+  TypeNameLimit: 24
+  DefaultArguments: true
+
+# Hover:
+#   ShowAKA: true
+#   MacroContentsLimit: 2048
