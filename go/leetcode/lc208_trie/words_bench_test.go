@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+const assets_location = "https://github.com/plar/go-adaptive-radix-tree/tree/master/test/assets"
+
 func readFileLines(filename string) ([]string, error) {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -26,7 +28,7 @@ func readFileLines(filename string) ([]string, error) {
 func benchDatasetInserts(b *testing.B, filename string) {
 	lines, err := readFileLines(filename)
 	if err != nil {
-		b.Fatalf("reading %s error: %v", filename, err)
+		b.Fatalf("reading %s error: %v [download the files from %s]", filename, err, assets_location)
 	}
 
 	// runtime.GC()

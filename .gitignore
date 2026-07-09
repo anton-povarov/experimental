@@ -33,3 +33,6 @@ _deps/
 # python
 *.egg-info/
 __pycache__/
+
+# clangd
+.cache/clangd
