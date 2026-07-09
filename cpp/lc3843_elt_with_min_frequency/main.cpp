@@ -1,6 +1,5 @@
-// https://leetcode.com/problems/first-element-with-unique-frequency
-
 #include <algorithm>
+#include <array>
 #include <print>
 #include <unordered_map>
 #include <vector>
@@ -64,17 +63,17 @@ public:
 		return -1;
 	}
 
-	// same as [with_hash_tables], but just use arrays instead of hashes,
+	// same as [with_hash_tables_2], but just use arrays instead of hashes,
 	int with_hash_tables_3(std::vector<int> const &nums)
 	{
 		if (nums.size() == 0) {
 			return -1;
 		}
 
-		int const        max_val = *std::max_element(nums.begin(), nums.end());
-		std::vector<int> num_to_freq(max_val + 1, 0);
+		int const max_val = *std::max_element(nums.begin(), nums.end());
 
 		// num -> frequency
+		std::vector<int> num_to_freq(max_val + 1, 0);
 		for (auto const num : nums) {
 			num_to_freq[num] += 1;
 		}
